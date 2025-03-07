@@ -236,7 +236,6 @@ int main(int argc, char *argv[])
         std::cout << "last_run.txt does not exist." << std::endl;
         initialize_settings();
     }
-    error_stop();
     return 0;
 }
 
