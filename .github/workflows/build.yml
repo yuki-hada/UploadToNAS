@@ -25,15 +25,13 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build
-        run: nimble build -d:release
+        run: nim c -d:release -o:UploadToNAS.exe src/uploadtonas.nim
 
       - name: Archive
         shell: pwsh
         run: |
-          $bin = (nimble dump | Select-String "^bin:").ToString().Split('"')[1]
-          $bin = $bin -replace '\.exe$', ''
           $tag = "${{ github.event.release.tag_name || github.event.inputs.version }}"
-          Compress-Archive -Path "${bin}.exe" -DestinationPath "${bin}-Windows-${tag}.zip"
+          Compress-Archive -Path "UploadToNAS.exe" -DestinationPath "UploadToNAS-Windows-${tag}.zip"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -65,9 +63,9 @@ jobs:
             --gcc.exe:i686-w64-mingw32-gcc \
             --gcc.linkerexe:i686-w64-mingw32-gcc \
             --passL:"-Wl,--major-os-version,6,--minor-os-version,1,--major-subsystem-version,6,--minor-subsystem-version,1" \
-            -o:uploadtonas.exe \
+            -o:UploadToNAS.exe \
             src/uploadtonas.nim
-          zip "uploadtonas-Windows7-${TAG}.zip" uploadtonas.exe
+          zip "UploadToNAS-Windows7-${TAG}.zip" UploadToNAS.exe
 
       - uses: actions/upload-artifact@v4
         with:
