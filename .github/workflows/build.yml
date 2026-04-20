@@ -1,0 +1,73 @@
+name: Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-windows:
+    name: Windows (modern)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jiro4989/setup-nim-action@v2
+        with:
+          nim-version: '2.x'
+
+      - name: Build
+        run: nimble build -d:release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: uploadtonas-windows
+          path: uploadtonas.exe
+
+  build-windows7:
+    name: Windows 7 (cross-compile)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jiro4989/setup-nim-action@v2
+        with:
+          nim-version: '2.x'
+
+      - name: Install MinGW cross-compiler
+        run: sudo apt-get install -y gcc-mingw-w64-x86-64
+
+      - name: Build for Windows 7
+        run: |
+          nim c -d:release \
+            --os:windows \
+            --cpu:amd64 \
+            --cc:gcc \
+            --gcc.exe:x86_64-w64-mingw32-gcc \
+            --gcc.linkerexe:x86_64-w64-mingw32-gcc \
+            --passL:"-Wl,--major-os-version,6,--minor-os-version,1,--major-subsystem-version,6,--minor-subsystem-version,1" \
+            -o:uploadtonas-win7.exe \
+            src/uploadtonas.nim
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: uploadtonas-windows7
+          path: uploadtonas-win7.exe
+
+  release:
+    name: Attach to release
+    needs: [build-windows, build-windows7]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/uploadtonas-windows/uploadtonas.exe
+            artifacts/uploadtonas-windows7/uploadtonas-win7.exe
