@@ -14,14 +14,15 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Nim
-        shell: bash
+        shell: pwsh
         run: |
-          curl -sSf https://nim-lang.org/choosenim/init.sh -o init.sh
-          CHOOSENIM_CHOOSE_VERSION=stable bash init.sh -y
-          echo "$HOME/.nimble/bin" >> $GITHUB_PATH
+          $version = (Invoke-WebRequest -Uri "https://nim-lang.org/channels/stable" -UseBasicParsing).Content.Trim()
+          Invoke-WebRequest -Uri "https://nim-lang.org/download/nim-${version}_x64.zip" -OutFile nim.zip
+          Expand-Archive nim.zip -DestinationPath C:\nim_install
+          $nimDir = (Get-ChildItem C:\nim_install | Select-Object -First 1).FullName
+          echo "$nimDir\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
 
       - name: Build
-        shell: bash
         run: nimble build -d:release
 
       - uses: actions/upload-artifact@v4
