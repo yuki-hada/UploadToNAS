@@ -15,6 +15,8 @@ jobs:
   build-windows:
     name: Windows (modern)
     runs-on: windows-latest
+    env:
+      TAG: ${{ github.event.inputs.version || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
 
@@ -30,8 +32,7 @@ jobs:
       - name: Archive
         shell: pwsh
         run: |
-          $tag = "${{ github.event.release.tag_name || github.event.inputs.version }}"
-          Compress-Archive -Path "UploadToNAS.exe" -DestinationPath "UploadToNAS-Windows-${tag}.zip"
+          Compress-Archive -Path "UploadToNAS.exe" -DestinationPath "UploadToNAS-Windows-$env:TAG.zip"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -41,6 +42,8 @@ jobs:
   build-windows7:
     name: Windows 7 (cross-compile)
     runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.inputs.version || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
 
@@ -55,7 +58,6 @@ jobs:
 
       - name: Build for Windows 7
         run: |
-          TAG="${{ github.event.release.tag_name || github.event.inputs.version }}"
           nim c -d:release \
             --os:windows \
             --cpu:i386 \
