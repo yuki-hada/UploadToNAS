@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Build test version (e.g., v0.0.0-test)'
+        required: false
+        default: 'v0.0.0-test'
 
 jobs:
   build-windows:
@@ -13,22 +18,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Nim
-        shell: pwsh
-        run: |
-          $version = (curl.exe -sSf https://nim-lang.org/channels/stable).Trim()
-          Invoke-WebRequest -Uri "https://nim-lang.org/download/nim-${version}_x64.zip" -OutFile nim.zip
-          Expand-Archive nim.zip -DestinationPath C:\nim_install
-          $nimDir = (Get-ChildItem C:\nim_install | Select-Object -First 1).FullName
-          echo "$nimDir\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+      - name: Setup Nim
+        uses: jiro4989/setup-nim-action@v2
+        with:
+          nim-version: stable
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build
         run: nimble build -d:release
 
+      - name: Archive
+        shell: pwsh
+        run: |
+          $bin = (nimble dump | Select-String "^bin:").ToString().Split('"')[1]
+          $bin = $bin -replace '\.exe$', ''
+          $tag = "${{ github.event.release.tag_name || github.event.inputs.version }}"
+          Compress-Archive -Path "${bin}.exe" -DestinationPath "${bin}-Windows-${tag}.zip"
+
       - uses: actions/upload-artifact@v4
         with:
-          name: uploadtonas-windows
-          path: uploadtonas.exe
+          name: artifact-windows
+          path: "*.zip"
 
   build-windows7:
     name: Windows 7 (cross-compile)
@@ -36,16 +46,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Nim
-        run: |
-          curl -sSf https://nim-lang.org/choosenim/init.sh | CHOOSENIM_CHOOSE_VERSION=stable bash -s -- -y
-          echo "$HOME/.nimble/bin" >> $GITHUB_PATH
+      - name: Setup Nim
+        uses: jiro4989/setup-nim-action@v2
+        with:
+          nim-version: stable
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install MinGW cross-compiler
         run: sudo apt-get install -y gcc-mingw-w64-x86-64
 
       - name: Build for Windows 7
         run: |
+          TAG="${{ github.event.release.tag_name || github.event.inputs.version }}"
           nim c -d:release \
             --os:windows \
             --cpu:amd64 \
@@ -53,13 +65,14 @@ jobs:
             --gcc.exe:x86_64-w64-mingw32-gcc \
             --gcc.linkerexe:x86_64-w64-mingw32-gcc \
             --passL:"-Wl,--major-os-version,6,--minor-os-version,1,--major-subsystem-version,6,--minor-subsystem-version,1" \
-            -o:uploadtonas-win7.exe \
+            -o:uploadtonas.exe \
             src/uploadtonas.nim
+          zip "uploadtonas-Windows7-${TAG}.zip" uploadtonas.exe
 
       - uses: actions/upload-artifact@v4
         with:
-          name: uploadtonas-windows7
-          path: uploadtonas-win7.exe
+          name: artifact-windows7
+          path: "*.zip"
 
   release:
     name: Attach to release
@@ -71,10 +84,12 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
+          merge-multiple: true
 
-      - name: Upload release assets
+      - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
+        if: github.event_name != 'workflow_dispatch'
         with:
-          files: |
-            artifacts/uploadtonas-windows/uploadtonas.exe
-            artifacts/uploadtonas-windows7/uploadtonas-win7.exe
+          files: "artifacts/*.zip"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
