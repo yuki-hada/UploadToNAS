@@ -16,7 +16,7 @@ jobs:
       - name: Install Nim
         shell: pwsh
         run: |
-          $version = (Invoke-WebRequest -Uri "https://nim-lang.org/channels/stable" -UseBasicParsing).Content.Trim()
+          $version = (curl.exe -sSf https://nim-lang.org/channels/stable).Trim()
           Invoke-WebRequest -Uri "https://nim-lang.org/download/nim-${version}_x64.zip" -OutFile nim.zip
           Expand-Archive nim.zip -DestinationPath C:\nim_install
           $nimDir = (Get-ChildItem C:\nim_install | Select-Object -First 1).FullName
